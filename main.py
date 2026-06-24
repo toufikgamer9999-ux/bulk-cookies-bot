@@ -8,7 +8,6 @@ from flask import Flask, request
 apihelper.ENABLE_MIDDLEWARE = True
 
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
-WEBHOOK_URL = os.environ.get('WEBHOOK_URL')
 bot = telebot.TeleBot(BOT_TOKEN)
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -307,12 +306,27 @@ http://skysysx.net/e/boss
 
     threading.Thread(target=finalize).start()
 
+app = Flask(__name__)
+
+# আপনার সার্ভারের URL এখানে বসান (অবশ্যই https হতে হবে)
+# উদাহরণ: https://my-bot-server.onrender.com
+WEBHOOK_URL_BASE = os.environ.get("WEBHOOK_URL_BASE") 
+WEBHOOK_URL_PATH = f"/{BOT_TOKEN}/"
+
+@app.route(WEBHOOK_URL_PATH, methods=['POST'])
+def webhook():
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return '', 200
+    else:
+        return 'Forbidden', 403
+
 if __name__ == "__main__":
-    # যদি এনভায়রনমেন্টে URL থাকে, তবেই সেট হবে
-    if WEBHOOK_URL:
-        bot.remove_webhook()
-        bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
-        
-    # রেন্ডার পোর্টের জন্য ডায়নামিক পোর্ট সেট করা
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    # পুরোনো পোলিং কনফিগারেশন মুছে নতুন করে ওয়েব হুক সেট করা
+    bot.remove_webhook()
+    bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH)
+    
+    # অ্যাপটি রান করা
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
